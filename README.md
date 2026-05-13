@@ -1,7 +1,7 @@
 # airr-at-cam-2026-aurora
 
 [![LaTeX build](../../actions/workflows/pdflatex.yml/badge.svg)](../../actions/workflows/pdflatex.yml)
-[![Slides](https://img.shields.io/badge/PDF-TechReport-orange.svg?style=flat)](../gh-action-result/pdf-slides/airr-at-cam-2026-aurora.pdf)
+[![Slides](https://img.shields.io/badge/PDF-Slides-orange.svg?style=flat)](../gh-action-result/pdf-slides/airr-at-cam-2026-aurora.pdf)
 
 AIRR@CAM 2026 presentation: "Porting the Aurora Weather Model to Intel Accelerated Hardware"
 
@@ -34,3 +34,8 @@ $ popd
 ```
 
 A PDF file `airr-at-cam-2026-aurora.pdf` of the slides will be generated.
+
+## Tech Report
+
+For the full technical report that goes alongside this presentation see the [aurora-hpc repository](https://github.com/alan-turing-institute/aurora-hpc/tree/main).
+
