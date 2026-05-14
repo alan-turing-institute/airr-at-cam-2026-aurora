@@ -16,16 +16,165 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Intro}
+\section{Title}
 
-\begin{enumerate}
-\setlength{\parskip}{0.5em}
-\item Predicts atmospheric variables
-\item Adapts to specialised forecasting tasks
-\item Microsoft Cambridge
-\end{enumerate}
+Title slide.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Aurora: A Foundation Model for the Earth}
+
+Hi; I'm David Llewellyn-Jones, a Data Scientist at the Alan Turing Institute. I'm part of the Research Computing Team alongside my colleagues Iain Stenson, Rosie Wood and Tomas Lazauskas, who is also here today.
+
+I'd like to talk to you about some work we did together porting the Aurora Weather Model to Dawn.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Let me start by explaining what Aurora is. I'm not a meteorologist or climatologist so I can only give you a very high-level overview, but essentially Aurora is an AI weather model that's been trained on very large atmospheric datasets containing a mixture of variables such as temperature and pressure values at different heights above sea level across the entirety of the Earth.
+
+One of Aurora's strengths is that the existing model was developed from training on a very diverse set of data to create a general atmospheric model. This makes it adaptable through fine-tuning to other specialised forecasting tasks, such as air pollution forecasting.
+
+In this sense it can be viewed as a {\bf foundation model}, because it's designed for other tasks to be built on top of it.
+
+Originally developed at Microsoft Cambridge, the team then moved to the Turing and while there are still Turing researchers working on it, my understanding is that the team is now moving to the University of Cambridge.
+
+The model was developed using NVIDIA A100 80 GiB devices and we -- as the Research Computing Team -- were given the task of determining whether the model could be moved successfully to non-NVIDIA platforms.
+
+In particular, we wanted to find out whether running it on Dawn would give similar computational results, whether we'd get similar performance and how easy the process of porting it would be.
+
+That's what I'll be reporting on today.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Inference comparison}
+
+So we did exactly that and because I only have 10 minutes I want to get straight in to the results.
+
+First of all for the accuracy of the results, we ran inference with the foundation model weights using ERA5 weather data.
+
+Here we're looking at a comparison of prediction on the left hand side {\it vs.} ground truth on the right hand side after a 7-day rollout temperatures recorded two-meters above sea level.
+
+The upper row shows results generated on Baskerville using A100 80 GiB GPUs.
+
+The lower row shows the same results generated on Dawn.
+
+As you can see they all look very similar, which is exactly what we'd hope to see.
+
+But we were surprised to discover that despite what it looks like, even with the same configuration we are actually getting minor differences in the calculated results.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Inference error comparison}
+
+We can see this better if we plot the differences between these graphs.
+
+Here the top row shows the difference between actual and predicted values on Dawn and Baskerville respectively.
+
+The bottom left diagram shows the difference between Dawn and Baskerville on the left.
+
+The bottom right diagram shows the difference between actual and actual, so is in fact a zero plot.
+
+So the bottom left graph is the interesting one. Note that the scales are different, but what we can see is errors that range between zero and 2.0 Kelvin and a Root Mean Square Error across the entire surface of 0.1 Kelvin.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Matrix-multiply-and-add errors}
+
+We were a little surprised by this so dug down a bit more. There's a lot going on with these models, so there's plenty of scope to pick up errors in the calculations.
+
+Moving from the weather model to a simple matrix multiply-and-add operation, we chose pseudo-random matrices on Dawn and Baskerville and performed repeated matrix multiply-and-add operations.
+
+As you can see, we performed the operation 512 times for various widths of floating point operation on the GPU, comparing the results with the results from 64-bit floating point operations performed on the CPU.
+
+Errors are typically introduced when the exponent changes and while the matrices were chosen at random, we tuned the random selection to maximise the likelihood of introducing such errors.
+
+What we found is that while bfloat 16 operations produced exactly the same results on both platforms, we saw slight differences in the results for FP 16 and FP 32 operations. The Intel GPUs gave consistently worse results for FP 32 and consistently better results for FP 16.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Weatherbench 2 comparison}
+
+It's important to note that for the results from the weather model data, we can't say which of the GPUs gave more accurate calculations. However the Aurora research term were keen to understand how impactful the difference between running on different GPUs would be to the actual output.
+
+This plot shows the scale of the errors in comparison to outputs from {\it different} models that have contributed results to Weatherbench 2, a platform used for public comparison of different weather models.
+
+The top line shows the RMSE for the Integrated Forecasting System, which is a numerical weather model and generally considered to be a baseline for comparison. The next line down shows the RMSE for the ensemble IFS forecast. The error bars show the potential variation introduced between the two GPUS.
+
+As we can see, the difference is real, but wouldn't be enough to reorder the outcomes for the Weatherbench 2 results.
+
+That's just to give a sense of the scale of the differences involved.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Inference timing}
+
+That gives us a sense of the calculation accuracy for inference, but what about performance?
+
+This table shows the time taken to perform inference rollout of the model for Dawn and Baskerville.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Inference timing comparison}
+
+I want to just focus on these numbers here. What these are effectively showing is that the time to perform a single rollout step is broadly similar across the systems, between six and seven seconds per rollout step.
+
+I've separated flat and composite hierarchies here so I should say a little about that.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Intel GPU architecture}
+
+On the Intel GPUs each graphics card contains essentially two GPUs, connected together with an Embedded Multi-Die Interconnect Bridge. A fast interconnect.
+
+The driver can be configured to allow each of these halves to be addressed separately, called {\it flat} model, or they can be seen as a single graphics card, called {\it composite}. In the latter case the processing units and memory are shared across the two halves.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Fine-tuning timings}
+
+For inference we found the hierarchy mode didn't make a huge difference, but for training we saw a different pattern.
+
+Here are the results from fine-tuning the Aurora model. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Fine-tuning timings for 1 half of a GPU}
+
+Let's first focus on these numbers.
+
+These are the equivalent numbers for training with a single Torch device, whether that be a single half in the case of the flat hierarchy or both halves in the case of composite.
+
+What we see is significantly improved results when using only half the GPU in the Intel case compared to using both halves in composite mode. Because the model fits on a single time, this is likely to be due to the impact of moving data across the interconnect.
+
+Training on the Intel GPU is also half as fast as training on the A100. However this must be put into perspective.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Fine-tuning timings for a full GPU}
+
+Rather than leaving it to the driver, if we perform distributed data parallel, considering each half of the GPU as being a separate GPU and letting PyTorch handle memory management, we get much closer training speeds compared to the A100.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Fine-tuning time graph}
+
+And in practice, what we see is that we have a very clear trade-off between model-size and performance.
+
+We're able to change the size of the Aurora model by increasing or decreasing the encoder and decoder depths.
+
+What we see is that when using flat hierarchy with the Intel GPU we get roughly similar -- only slightly worse -- training times compared to the A100 80 GiB.
+
+However, we run out of memory for storing the model more quickly. The Intel GPU has 64 GiB of memory on each half. In composite mode we can combine this to give 128 GiB of memory in order to support much larger model sizes, but there's a really large performance hit from doing this.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{LInks}
+
+If you want to look further into the details we've written up a technical report which you can access with the link here.
+
+Aurora continues to be worked on and Iain is currently porting it to Jasmin, which offers predeployed weather datasets.
+
+Weather models in general are large and getting larger, so the message I'm hearing is that providing more GPU memory as well as good documentation about CPU offloading -- for example using DeepSpeed -- would be a helpful direction for HPC to take for the Earth Systems Training community.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
