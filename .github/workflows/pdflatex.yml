@@ -23,6 +23,7 @@ jobs:
           git checkout --orphan gh-action-result/pdf-slides
           git rm -rf .
           git add airr-at-cam-2026-aurora.pdf
+          git add notes.pdf
           git -c user.name='GitHub Action' -c user.email='action@github.com' commit -m "Built PDF documents"
       - name: Push changes
         uses: ad-m/github-push-action@master

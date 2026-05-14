@@ -2,6 +2,7 @@
 
 [![LaTeX build](../../actions/workflows/pdflatex.yml/badge.svg)](../../actions/workflows/pdflatex.yml)
 [![Slides](https://img.shields.io/badge/PDF-Slides-orange.svg?style=flat)](../gh-action-result/pdf-slides/airr-at-cam-2026-aurora.pdf)
+[![Notes](https://img.shields.io/badge/PDF-Notes-orange.svg?style=flat)](../gh-action-result/pdf-slides/notes.pdf)
 
 AIRR@CAM 2026 presentation: "Porting the Aurora Weather Model to Intel Accelerated Hardware"
 
